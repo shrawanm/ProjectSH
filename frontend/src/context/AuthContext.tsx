@@ -1,4 +1,4 @@
-import  { useState, createContext, useContext, ReactNode } from 'react';
+import { useState, createContext, useContext, ReactNode } from 'react';
 
 export interface User {
   id: string;
@@ -11,8 +11,8 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => void;
-  signup: (name: string, email: string, password: string) => void;
+  login: (email: string, password: string) => Promise<User>;
+  signup: (name: string, email: string, password: string) => Promise<User>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => void;
 }
@@ -27,56 +27,76 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const login = async (email: string, password: string) => {
-  setLoading(true);
-  try {
-    const res = await fetch("http://localhost/ShrawanHandicraftsFYP/backend/api/login.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+  // ---------------- LOGIN ----------------
+  const login = async (email: string, password: string): Promise<User> => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        "http://localhost/ShrawanHandicraftsFYP/backend/api/login.php",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        }
+      );
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.status === "success") {
-      // only set user if login succeeds
-      setUser({
+      if (data.status !== "success") {
+        throw new Error(data.message || "Invalid credentials");
+      }
+
+      const userData: User = {
         id: data.user.id,
         name: data.user.name,
         email: data.user.email,
         avatar: data.user.avatar,
-        role: data.user.role
-      });
-      return data.user;
-    } else {
-      // throw error if login fails
-      throw new Error(data.message || "Invalid credentials");
-    }
-  } catch (err) {
-    throw err;
-  } finally {
-    setLoading(false);
-  }
-};
+        role: data.user.role,
+      };
 
-  const signup = async (name: string, email: string, password: string) => {
+      setUser(userData);
+      return userData;
+
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ---------------- SIGNUP (FIXED) ----------------
+  const signup = async (
+    name: string,
+    email: string,
+    password: string
+  ): Promise<User> => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost/ShrawanHandicraftsFYP/backend/api/signup.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
+      const res = await fetch(
+        "http://localhost/ShrawanHandicraftsFYP/backend/api/signup.php",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password }),
+        }
+      );
+
       const data = await res.json();
 
-      if (data.status === "success") {
-        setUser({ id: "u2", name, email, avatar: null, role: "user" });
-      } else {
+      // ❗ THIS IS THE KEY FIX
+      if (data.status !== "success") {
         throw new Error(data.message || "Signup failed");
       }
-    } catch (err) {
-      console.error(err);
-      alert(err instanceof Error ? err.message : "Signup failed");
+
+      const userData: User = {
+        id: data.user.id,
+        name: data.user.name,
+        email: data.user.email,
+        avatar: data.user.avatar,
+        role: data.user.role,
+      };
+
+      setUser(userData);
+      return userData;
+
     } finally {
       setLoading(false);
     }
@@ -87,11 +107,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const updateProfile = (data: Partial<User>) => {
-    setUser(prev => prev ? { ...prev, ...data } : null);
+    setUser(prev => (prev ? { ...prev, ...data } : null));
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, updateProfile }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, signup, logout, updateProfile }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -99,6 +121,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within an AuthProvider");
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
   return context;
 }
