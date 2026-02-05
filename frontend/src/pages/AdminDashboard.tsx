@@ -16,7 +16,7 @@ export function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Mock Orders Data
+  // mock datas
   const orders: Order[] = [
     { id: 'ORD-2024-001', customer: 'Anish Dahal', date: '2024-03-20', total: 12500, status: 'Delivered', items: 3 },
     { id: 'ORD-2024-002', customer: 'Sita Sharma', date: '2024-03-21', total: 4500, status: 'Processing', items: 1 }
@@ -30,17 +30,31 @@ export function AdminDashboard() {
     } catch (e) { console.error(e); }
   };
 
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/users.php');
-      const data = await res.json();
-      setUsers(Array.isArray(data) ? data : []);
-    } catch (e) { console.error(e); }
-  };
+const fetchUsers = async () => {
+  try {
+    const res = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/users.php');
+    const data = await res.json();
+    
+    // Mapping php names to the react names
+    const formattedUsers = Array.isArray(data) ? data.map((u: any) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      // map registration_method from PHP to registrationMethod for react
+      registrationMethod: u.registration_method, 
+      status: u.status,
+      joined: u.created_at
+    })) : [];
+
+    setUsers(formattedUsers);
+  } catch (e) { 
+    console.error(e); 
+  }
+};
 
   useEffect(() => { fetchProducts(); fetchUsers(); }, []);
 
-  // --- DELETE FUNCTIONS ---
+
   const handleDeleteProduct = async (id: number) => {
     if (!window.confirm('Delete this product permanently?')) return;
     try {
@@ -160,7 +174,6 @@ export function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950 flex text-text-primary">
-      {/* Sidebar with original icons */}
       <aside className="w-64 bg-white dark:bg-bg-card border-r border-gray-200 dark:border-gray-800 fixed h-full flex flex-col z-20 shadow-xl shadow-gray-200/50 dark:shadow-none">
         <div className="p-8">
           <h1 className="text-2xl font-serif font-bold text-text-primary tracking-tight">SHRAWAN</h1>
