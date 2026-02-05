@@ -37,7 +37,7 @@ export const categories = [
       { id: 'crafts', name: 'Crafts' },
       {
         id: 'painting',
-        name: 'Painting',
+        name: 'Paintings',
         subsubcategories: [
           { id: 'batik-painting', name: 'Batik Painting' },
           { id: 'silk-painting', name: 'Silk Painting' }
