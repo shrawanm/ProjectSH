@@ -1,4 +1,3 @@
-import React, { Children } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, ChevronRight } from 'lucide-react';
@@ -10,7 +9,6 @@ export function PashminaCategory() {
     return <div className="pt-32 text-center">Category not found</div>;
   }
   return <div className="min-h-screen pt-24 pb-12 bg-bg-light dark:bg-bg-dark">
-      {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
         <div className="flex items-center gap-2 text-sm text-text-secondary">
           <Link to="/collections" className="hover:text-accent transition-colors">
@@ -21,7 +19,6 @@ export function PashminaCategory() {
         </div>
       </div>
 
-      {/* Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
         <motion.div initial={{
         opacity: 0,
@@ -39,7 +36,6 @@ export function PashminaCategory() {
         </motion.div>
       </div>
 
-      {/* Subcategories Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {category.subcategories.map((subcategory, index) => <motion.div key={subcategory.id} initial={{
