@@ -1,13 +1,74 @@
 <?php
+function sendTemplateEmail(
+    string $toEmail,
+    int $templateId,
+    array $params = [],
+    ?string &$errorMessage = null
+): bool {
+
+    $apiKey = '';
+    $url = 'https://api.brevo.com/v3/smtp/email';
+
+   
+    if (empty($params)) {
+        $params = ["status" => "testing"]; 
+    }
+
+    $data = [
+        "sender" => [
+            "name" => "Shrawan Handicrafts",
+            "email" => "shrawanmainali261@gmail.com"
+        ],
+        "to" => [
+            ["email" => $toEmail]
+        ],
+        "templateId" => $templateId,
+        "params" => $params
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'api-key: ' . $apiKey,
+        'Content-Type: application/json',
+        'Accept: application/json'
+    ]);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    // curl_close($ch);
+
+    if ($response === false) {
+        $errorMessage = "cURL error: " . $curlError;
+        return false;
+    }
+
+    $decoded = json_decode($response, true);
+
+    if ($httpCode !== 200 && $httpCode !== 201) {
+        // Log the full response for better debugging
+        $errorMessage = "Brevo API error (HTTP $httpCode): " . ($decoded['message'] ?? json_encode($decoded));
+        return false;
+    }
+
+    return true;
+}
+
+
+// otp email
 function sendOTPEmail(string $toEmail, string $otpCode, ?string &$errorMessage = null): bool
 {
-    $apiKey = ''; 
+    $apiKey = '';
     $url = 'https://api.brevo.com/v3/smtp/email';
 
     $data = [
         "sender" => [
             "name" => "Shrawan Handicrafts",
-            "email" => "shrawanhandicraftss@gmail.com" 
+            "email" => "shrawanmainali261@gmail.com"
         ],
         "to" => [
             ["email" => $toEmail]
@@ -46,4 +107,20 @@ function sendOTPEmail(string $toEmail, string $otpCode, ?string &$errorMessage =
 
     return true;
 }
-?>
+
+function sendWelcomeEmail(string $email, string $name, ?string &$errorMessage = null): bool
+{
+    $welcomeTemplateId = 1; 
+    $params = ["name" => $name];
+
+    return sendTemplateEmail($email, $welcomeTemplateId, $params, $errorMessage);
+}
+
+function sendAbandonedCartTest(string $email, ?string &$errorMessage = null): bool
+{
+    $templateId = 5; 
+    // Simplified to empty array; sendTemplateEmail handles the object conversion
+    $params = []; 
+
+    return sendTemplateEmail($email, $templateId, $params, $errorMessage);
+}
