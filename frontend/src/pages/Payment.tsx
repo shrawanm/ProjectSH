@@ -22,7 +22,6 @@ export function Payment() {
           const s = Array.isArray(data.data) ? {} : data.data;
           setSettings(s);
 
-          /* Handle initial payment method selection based on availability */
           if (s.esewa_enabled === 'false' && s.pickup_enabled === 'false') {
             setPaymentMethod(null);
           } else if (s.esewa_enabled === 'false' && paymentMethod === 'card') {
@@ -35,7 +34,6 @@ export function Payment() {
       .catch(err => console.error("Settings fetch error:", err));
   }, []);
 
-  // Get checkoutId from location state (passed from Checkout.tsx)
   const checkoutId = location.state?.checkoutId;
 
   useEffect(() => {
@@ -109,7 +107,7 @@ export function Payment() {
         const data = await response.json();
 
         if (data.status === 'success') {
-          // Create a hidden form and submit it to eSewa
+          // hidden form and submit to eSewa
           const form = document.createElement('form');
           form.method = 'POST';
           form.action = 'https://rc-epay.esewa.com.np/api/epay/main/v2/form';
