@@ -1,30 +1,33 @@
 import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { 
-  Package, ShoppingCart, Users, Search, Plus, Edit2, 
+import {
+  Package, ShoppingCart, Users, Search, Plus, Edit2,
   Trash2, Filter, AlertCircle, ChevronRight, Settings,
   Eye, X, Mail, Phone, MapPin, Calendar,
 } from 'lucide-react';
-import { Product, User } from './AdminTypes';
+import { Product, User, Analytics, StoreSettings } from './AdminTypes';
 import { ProductModal } from './ProductModal';
+import { BarChart, TrendingUp, DollarSign, CreditCard as CardIcon, Store, Globe, Phone as PhoneIcon, Mail as MailIcon, MapPin as MapIcon, Save, ToggleLeft, ToggleRight } from 'lucide-react';
 
 export function AdminDashboard() {
-  // Tabs & UI State
   const [activeTab, setActiveTab] = useState('products');
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Product States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productList, setProductList] = useState<Product[]>([]);
-  
-  // User States
   const [users, setUsers] = useState<User[]>([]);
-  
-  // Order States
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [settings, setSettings] = useState<StoreSettings>({
+    esewa_enabled: 'true',
+    pickup_enabled: 'true',
+    store_email: '',
+    store_phone: '',
+    store_address: ''
+  });
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchProducts = async () => {
     try {
@@ -42,7 +45,7 @@ export function AdminDashboard() {
         id: u.id,
         name: u.name,
         email: u.email,
-        registrationMethod: u.registration_method, 
+        registrationMethod: u.registration_method,
         status: u.status,
         joined: u.created_at
       })) : [];
@@ -52,19 +55,88 @@ export function AdminDashboard() {
 
   const fetchOrders = async () => {
     try {
-      // fetchs users orders data using get_orders.php
       const res = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/get_orders.php');
       const data = await res.json();
       setOrders(Array.isArray(data) ? data : []);
     } catch (e) { console.error("Order Fetch Error:", e); }
   };
 
-  useEffect(() => { 
-    fetchProducts(); 
-    fetchUsers(); 
-    fetchOrders(); 
-  }, []);
+  const updateOrderStatus = async (orderId: number, newStatus: string, userEmail: string) => {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
 
+    try {
+      const res = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/update_cart_status.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: orderId, status: newStatus, user_email: userEmail })
+      });
+      const text = await res.text();
+      const data = JSON.parse(text.trim());
+      console.log('Response:', data);
+      if (!res.ok) {
+        fetchOrders();
+        alert(`Failed: ${data.error}`);
+      }
+    } catch (e) {
+      fetchOrders();
+      console.error('Full error:', e);
+      alert("Failed to update order status");
+    }
+  };
+
+  const fetchAnalytics = async () => {
+    try {
+      const res = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/get_analytics.php');
+      const data = await res.json();
+      if (data.status === 'success') setAnalytics(data.data);
+    } catch (e) { console.error("Analytics Fetch Error:", e); }
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/store_settings.php');
+      const data = await res.json();
+      if (data.status === 'success' && data.data) {
+        // Merge with existing state to ensure we have all keys even if DB is partially empty
+        setSettings(prev => ({
+          ...prev,
+          ...(Array.isArray(data.data) ? {} : data.data)
+        }));
+      }
+    } catch (e) {
+      console.error("Settings Fetch Error:", e);
+    }
+  };
+
+  const saveSettings = async (newSettings: StoreSettings) => {
+    setIsSaving(true);
+    try {
+      const res = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/store_settings.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings)
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        alert('Settings saved successfully! The changes are now live.');
+      } else {
+        alert('Error: ' + (data.message || 'Failed to save settings.'));
+      }
+    } catch (e) {
+      console.error("Save Error:", e);
+      alert('Connection Error: Could not reach the server to save settings.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+    fetchUsers();
+    fetchOrders();
+    fetchAnalytics();
+    fetchSettings();
+  }, []);
 
   const handleDeleteProduct = async (id: number) => {
     if (!window.confirm('Delete this product permanently?')) return;
@@ -82,12 +154,10 @@ export function AdminDashboard() {
     } catch (e) { alert("Failed to delete user"); }
   };
 
-
   const renderContent = () => {
-    // Shared Search Logic for Products & Orders
     const filteredProducts = productList.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
-    const filteredOrders = orders.filter(o => 
-      o.first_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const filteredOrders = orders.filter(o =>
+      o.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       o.id.toString().includes(searchQuery)
     );
 
@@ -98,12 +168,12 @@ export function AdminDashboard() {
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="relative w-full md:w-96">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-                <input 
-                  type="text" 
-                  placeholder="Search inventory..." 
-                  className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-bg-card border border-gray-200 dark:border-gray-800 rounded-lg outline-none focus:ring-2 focus:ring-accent/10" 
-                  value={searchQuery} 
-                  onChange={e => setSearchQuery(e.target.value)} 
+                <input
+                  type="text"
+                  placeholder="Search inventory..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-bg-card border border-gray-200 dark:border-gray-800 rounded-lg outline-none focus:ring-2 focus:ring-accent/10"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
                 />
               </div>
               <div className="flex gap-2 w-full md:w-auto">
@@ -111,7 +181,6 @@ export function AdminDashboard() {
                 <button onClick={() => { setSelectedProduct(null); setModalMode('add'); setIsModalOpen(true); }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-accent text-white rounded-lg shadow-lg shadow-accent/20 hover:bg-accent-hover transition-all"><Plus className="w-4 h-4" /> Add Product</button>
               </div>
             </div>
-
             <div className="bg-white dark:bg-bg-card rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
               <table className="w-full text-left">
                 <thead className="bg-gray-50 dark:bg-gray-900/50 text-[11px] uppercase tracking-wider text-text-secondary font-bold">
@@ -176,14 +245,14 @@ export function AdminDashboard() {
         return (
           <div className="space-y-6">
             <div className="relative w-full md:w-96">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-                <input 
-                  type="text" 
-                  placeholder="Search by name or order ID..." 
-                  className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-bg-card border border-gray-200 dark:border-gray-800 rounded-lg outline-none" 
-                  value={searchQuery} 
-                  onChange={e => setSearchQuery(e.target.value)} 
-                />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+              <input
+                type="text"
+                placeholder="Search by name or order ID..."
+                className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-bg-card border border-gray-200 dark:border-gray-800 rounded-lg outline-none"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
             </div>
             <div className="bg-white dark:bg-bg-card rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
               <table className="w-full text-left">
@@ -194,7 +263,6 @@ export function AdminDashboard() {
                     <th>Date</th>
                     <th>Total</th>
                     <th>Status</th>
-                    
                     <th className="p-6 text-right">Details</th>
                   </tr>
                 </thead>
@@ -209,14 +277,21 @@ export function AdminDashboard() {
                       <td className="text-text-secondary text-sm">{new Date(o.created_at).toLocaleDateString()}</td>
                       <td className="font-bold">Rs. {Number(o.total_amount).toLocaleString()}</td>
                       <td>
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                          o.status === 'completed' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'
-                        }`}>
-                          {o.status}
-                        </span>
+                        <select
+                          value={o.status ?? 'pending'}
+                          onChange={e => updateOrderStatus(o.id, e.target.value, o.user_email)}
+                          className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase border-0 outline-none cursor-pointer ${o.status === 'delivered' ? 'bg-green-50 text-green-600' :
+                            o.status === 'pending' ? 'bg-amber-50 text-amber-600' :
+                              'bg-blue-50 text-blue-600'
+                            }`}
+                        >
+                          <option value="active">Active</option>
+                          <option value="pending">Pending</option>
+                          <option value="delivered">Delivered</option>
+                        </select>
                       </td>
                       <td className="p-6 text-right">
-                        <button 
+                        <button
                           onClick={() => setSelectedOrder(o)}
                           className="p-2 text-accent hover:bg-accent/5 rounded-lg transition-all"
                         >
@@ -231,17 +306,227 @@ export function AdminDashboard() {
           </div>
         );
 
-      default:
-        return <div className="p-20 text-center text-text-secondary"><AlertCircle className="mx-auto mb-4 w-12 h-12 opacity-20" />This section is currently being updated.</div>;
+      case 'settings':
+        return (
+          <div className="space-y-10 pb-20">
+            {/* Analytics Section */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-serif font-bold text-text-primary">Sales Analytics</h2>
+                  <p className="text-sm text-text-secondary mt-1">Real-time performance overview</p>
+                </div>
+                <button onClick={fetchAnalytics} className="text-accent hover:underline text-sm font-medium">Refresh Data</button>
+              </div>
+
+              {analytics && (
+                <>
+                  {/* KPI Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {[
+                      { label: 'Total Revenue', value: `Rs. ${analytics.overview.totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
+                      { label: 'Total Orders', value: analytics.overview.totalOrders, icon: ShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50' },
+                      { label: 'Avg. Order', value: `Rs. ${Math.round(analytics.overview.avgOrderValue).toLocaleString()}`, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
+                    ].map((kpi, i) => (
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} key={i} className="bg-white dark:bg-bg-card p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex items-center gap-6">
+                        <div className={`p-4 ${kpi.bg} ${kpi.color} rounded-xl`}><kpi.icon className="w-6 h-6" /></div>
+                        <div>
+                          <p className="text-xs font-bold text-text-secondary uppercase tracking-widest">{kpi.label}</p>
+                          <p className="text-2xl font-black text-text-primary mt-1">{kpi.value}</p>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Daily Sales Bar Chart */}
+                    <div className="bg-white dark:bg-bg-card p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-6 flex items-center gap-2"><BarChart className="w-4 h-4" /> Weekly Revenue Trend</h3>
+                      <div className="flex items-end justify-between h-48 gap-2 pt-4">
+                        {analytics.dailySales.map((day, i) => {
+                          const maxRevenue = Math.max(...analytics.dailySales.map(d => d.revenue), 1);
+                          const height = (day.revenue / maxRevenue) * 100;
+                          return (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+                              <div className="relative w-full flex flex-col justify-end h-full">
+                                <motion.div
+                                  initial={{ height: 0 }}
+                                  animate={{ height: `${height}%` }}
+                                  className="w-full bg-accent/20 group-hover:bg-accent/40 rounded-t-lg transition-colors relative"
+                                >
+                                  {day.revenue > 0 && (
+                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                                      Rs. {day.revenue.toLocaleString()}
+                                    </div>
+                                  )}
+                                </motion.div>
+                              </div>
+                              <span className="text-[10px] font-bold text-text-secondary uppercase">{day.date}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Payment Breakdown */}
+                    <div className="bg-white dark:bg-bg-card p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-6 flex items-center gap-2"><CardIcon className="w-4 h-4" /> Payment Distribution</h3>
+                      <div className="space-y-6 text-text-primary">
+                        {analytics.paymentBreakdown.length > 0 ? (
+                          analytics.paymentBreakdown.map((pm, i) => (
+                            <div key={i} className="space-y-2">
+                              <div className="flex justify-between items-end">
+                                <span className="text-sm font-medium capitalize">{pm.payment_method}</span>
+                                <span className="text-xs font-bold text-text-secondary">Rs. {Number(pm.revenue).toLocaleString()} ({pm.count} orders)</span>
+                              </div>
+                              <div className="h-2 w-full bg-gray-100 dark:bg-gray-900 rounded-full overflow-hidden">
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${analytics.overview.totalRevenue > 0 ? (pm.revenue / analytics.overview.totalRevenue) * 100 : 0}%` }}
+                                  className={`h-full ${pm.payment_method === 'esewa' ? 'bg-accent' : pm.payment_method === 'pickup' ? 'bg-blue-500' : 'bg-gray-400'}`}
+                                />
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="h-32 flex items-center justify-center text-text-secondary opacity-40 text-xs italic">No payment data available yet.</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Top Products */}
+                    <div className="bg-white dark:bg-bg-card p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm lg:col-span-2">
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-6 flex items-center gap-2"><Package className="w-4 h-4" /> Best Sellers</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {analytics.topProducts.map((p, i) => (
+                          <div key={i} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-gray-100 dark:border-gray-800">
+                            <img src={p.image} className="w-12 h-12 rounded-lg object-cover bg-white" alt="" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-text-primary truncate">{p.name}</p>
+                              <p className="text-[10px] text-text-secondary font-medium">{p.sales} units sold</p>
+                              <p className="text-xs font-black text-accent mt-1">Rs. {Number(p.revenue).toLocaleString()}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {analytics.topProducts.length === 0 && (
+                          <div className="col-span-full h-20 flex items-center justify-center text-text-secondary opacity-40 text-xs italic">No sales data available for products.</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Store Settings Section */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-serif font-bold text-text-primary">Store Configuration</h2>
+                  <p className="text-sm text-text-secondary mt-1">Manage global site settings and payment methods</p>
+                </div>
+                <button
+                  disabled={isSaving}
+                  onClick={() => saveSettings(settings)}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-accent text-white rounded-xl shadow-lg shadow-accent/20 hover:bg-accent-hover transition-all disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" /> {isSaving ? 'Saving...' : 'Save Settings'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Payment Settings */}
+                <div className="bg-white dark:bg-bg-card p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-6">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-2 flex items-center gap-2"><DollarSign className="w-4 h-4" /> Payment Gateways</h3>
+
+                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-gray-100 dark:border-gray-800 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="p-2 bg-white dark:bg-bg-card border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm">
+                        <img src="https://esewa.com.np/common/images/esewa_logo.png" className="h-5 w-auto" alt="eSewa" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold">eSewa Payments</p>
+                        <p className="text-[10px] text-text-secondary uppercase font-bold tracking-tight">V2 ePay Integration</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSettings(s => ({ ...s, esewa_enabled: s.esewa_enabled === 'true' ? 'false' : 'true' }))}
+                    >
+                      {settings.esewa_enabled === 'true' ? <ToggleRight className="w-10 h-10 text-accent" /> : <ToggleLeft className="w-10 h-10 text-gray-300" />}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-gray-100 dark:border-gray-800 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="p-2 bg-white dark:bg-bg-card border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm">
+                        <Store className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold">Store Pickup</p>
+                        <p className="text-[10px] text-text-secondary uppercase font-bold tracking-tight">Physical Location Reservation</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSettings(s => ({ ...s, pickup_enabled: s.pickup_enabled === 'true' ? 'false' : 'true' }))}
+                    >
+                      {settings.pickup_enabled === 'true' ? <ToggleRight className="w-10 h-10 text-blue-600" /> : <ToggleLeft className="w-10 h-10 text-gray-300" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Contact Settings */}
+                <div className="bg-white dark:bg-bg-card p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-6">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-2 flex items-center gap-2"><Globe className="w-4 h-4" /> Public Contact Info</h3>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest flex items-center gap-2"><MailIcon className="w-2.5 h-2.5" /> Support Email</label>
+                      <input
+                        type="email"
+                        value={settings.store_email}
+                        onChange={e => setSettings(s => ({ ...s, store_email: e.target.value }))}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl outline-none focus:ring-2 focus:ring-accent/10 transition-all text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest flex items-center gap-2"><PhoneIcon className="w-2.5 h-2.5" /> Store Phone</label>
+                      <input
+                        type="text"
+                        value={settings.store_phone}
+                        onChange={e => setSettings(s => ({ ...s, store_phone: e.target.value }))}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl outline-none focus:ring-2 focus:ring-accent/10 transition-all text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest flex items-center gap-2"><MapIcon className="w-2.5 h-2.5" /> Physical Address</label>
+                      <textarea
+                        rows={3}
+                        value={settings.store_address}
+                        onChange={e => setSettings(s => ({ ...s, store_address: e.target.value }))}
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl outline-none focus:ring-2 focus:ring-accent/10 transition-all text-sm resize-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="p-8 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/50 rounded-2xl flex items-start gap-4">
+                <AlertCircle className="w-6 h-6 text-amber-600 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm">Caution: Payment Method Toggles</h4>
+                  <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 leading-relaxed opacity-80">Disabling a payment gateway will immediately remove it as an option from the customer checkout page. Ensure at least one method remains active to avoid checkout failures.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950 flex text-text-primary">
-      {/* SIDEBAR */}
       <aside className="w-64 bg-white dark:bg-bg-card border-r border-gray-200 dark:border-gray-800 fixed h-full flex flex-col z-20 shadow-xl shadow-gray-200/50 dark:shadow-none">
         <div className="p-8">
-          <h1 className="text-2xl font-serif font-bold text-text-primary tracking-tight">SHRAWAN</h1>
+          <h1 className="text-2xl font-serif font-bold text-text-primary tracking-tight">ADMIN</h1>
           <div className="h-1 w-12 bg-accent mt-1 rounded-full"></div>
         </div>
         <nav className="flex-1 px-4 space-y-1">
@@ -249,7 +534,7 @@ export function AdminDashboard() {
             { id: 'products', label: 'Inventory', icon: Package },
             { id: 'orders', label: 'Orders', icon: ShoppingCart },
             { id: 'users', label: 'Customers', icon: Users },
-            { id: 'settings', label: 'Store Settings', icon: Settings },
+            { id: 'settings', label: 'Dashboard', icon: Settings },
           ].map(item => (
             <button key={item.id} onClick={() => { setActiveTab(item.id); setSearchQuery(''); }} className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl text-sm font-medium transition-all ${activeTab === item.id ? 'bg-accent text-white shadow-lg shadow-accent/30' : 'text-text-secondary hover:bg-gray-50 dark:hover:bg-gray-900'}`}>
               <item.icon className="w-5 h-5" /> {item.label}
@@ -258,7 +543,6 @@ export function AdminDashboard() {
         </nav>
       </aside>
 
-      {/* MAIN VIEW */}
       <main className="flex-1 ml-64 min-h-screen flex flex-col">
         <header className="h-20 bg-white/80 dark:bg-bg-card/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-10 sticky top-0 z-10">
           <div className="flex items-center gap-2 text-text-secondary">
@@ -267,7 +551,7 @@ export function AdminDashboard() {
             <span className="text-sm opacity-60">Management</span>
           </div>
           <div className="flex items-center gap-6">
-            <div className="flex flex-col items-end"><p className="text-sm font-bold">Admin User</p><p className="text-[10px] text-accent font-bold uppercase tracking-widest">Super Admin</p></div>
+            <div className="flex flex-col items-end"><p className="text-sm font-bold">Admin User</p><p className="text-[10px] text-accent font-bold uppercase tracking-widest">Admin</p></div>
             <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-800"></div>
           </div>
         </header>
@@ -275,7 +559,6 @@ export function AdminDashboard() {
         <div className="p-10">{renderContent()}</div>
       </main>
 
-      {/* PRODUCT MODAL */}
       <AnimatePresence>
         {isModalOpen && (
           <ProductModal mode={modalMode} product={selectedProduct} onClose={() => setIsModalOpen(false)} onSave={async (data: Product) => {
@@ -292,11 +575,10 @@ export function AdminDashboard() {
         )}
       </AnimatePresence>
 
-      {/* ORDER DETAILS MODAL */}
       <AnimatePresence>
         {selectedOrder && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
@@ -304,23 +586,22 @@ export function AdminDashboard() {
             >
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/50">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-accent/10 rounded-lg text-accent"><ShoppingCart className="w-5 h-5"/></div>
+                  <div className="p-2 bg-accent/10 rounded-lg text-accent"><ShoppingCart className="w-5 h-5" /></div>
                   <h3 className="font-serif text-xl font-bold text-text-primary">Order #ORD-{selectedOrder.id}</h3>
                 </div>
-                <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><X className="w-5 h-5"/></button>
+                <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><X className="w-5 h-5" /></button>
               </div>
-              
+
               <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                {/* Section: Top Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="p-4 bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-gray-100 dark:border-gray-800">
-                    <h4 className="text-[10px] uppercase tracking-widest text-accent font-bold mb-3 flex items-center gap-2"><Mail className="w-3 h-3"/> Customer Profile</h4>
+                    <h4 className="text-[10px] uppercase tracking-widest text-accent font-bold mb-3 flex items-center gap-2"><Mail className="w-3 h-3" /> Customer Profile</h4>
                     <p className="font-bold text-text-primary text-lg">{selectedOrder.first_name} {selectedOrder.last_name}</p>
                     <p className="text-sm text-text-secondary mt-1">{selectedOrder.user_email}</p>
-                    <p className="text-sm text-text-secondary flex items-center gap-2 mt-1"><Phone className="w-3 h-3"/> {selectedOrder.phone}</p>
+                    <p className="text-sm text-text-secondary flex items-center gap-2 mt-1"><Phone className="w-3 h-3" /> {selectedOrder.phone}</p>
                   </div>
                   <div className="p-4 bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-gray-100 dark:border-gray-800">
-                    <h4 className="text-[10px] uppercase tracking-widest text-accent font-bold mb-3 flex items-center gap-2"><MapPin className="w-3 h-3"/> Shipping Address</h4>
+                    <h4 className="text-[10px] uppercase tracking-widest text-accent font-bold mb-3 flex items-center gap-2"><MapPin className="w-3 h-3" /> Shipping Address</h4>
                     <p className="text-sm text-text-secondary leading-relaxed">
                       {selectedOrder.address}<br />
                       {selectedOrder.city}, {selectedOrder.postal_code}<br />
@@ -329,9 +610,8 @@ export function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Section: Products List */}
                 <div>
-                  <h4 className="text-[10px] uppercase tracking-widest text-accent font-bold mb-4 flex items-center gap-2"><Package className="w-3 h-3"/> Ordered Items</h4>
+                  <h4 className="text-[10px] uppercase tracking-widest text-accent font-bold mb-4 flex items-center gap-2"><Package className="w-3 h-3" /> Ordered Items</h4>
                   <div className="space-y-3">
                     {selectedOrder.cart_items.map((item: any, idx: number) => (
                       <div key={idx} className="flex justify-between items-center p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl">
@@ -355,12 +635,11 @@ export function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Modal Footer */}
               <div className="p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-4">
                   <div className="flex flex-col">
                     <span className="text-[10px] uppercase font-bold text-text-muted">Order Date</span>
-                    <span className="text-xs font-medium flex items-center gap-1"><Calendar className="w-3 h-3"/> {new Date(selectedOrder.created_at).toLocaleString()}</span>
+                    <span className="text-xs font-medium flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(selectedOrder.created_at).toLocaleString()}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
