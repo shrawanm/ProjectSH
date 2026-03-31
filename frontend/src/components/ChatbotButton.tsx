@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const GROQ_API_KEY = "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"; 
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_API_KEY = ""; 
+const GROQ_API_URL = "";
 const GROQ_MODEL = "llama-3.1-8b-instant";
 
 interface Message {
