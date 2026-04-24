@@ -22,6 +22,7 @@ try {
         echo json_encode([
             "status" => "success",
             "data" => [
+                "id"         => $row['id'],
                 "email"      => $row['user_email'],
                 "firstName"  => $row['first_name'],
                 "lastName"   => $row['last_name'],
