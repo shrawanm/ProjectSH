@@ -6,6 +6,7 @@ import { ProductCard } from '../components/ProductCard';
 import { useProductHook } from '../pages/productHook'; 
 
 export function MufflerProducts() {
+  // Gets muffler subcategory from mockData
   const category = categories.find(c => c.id === 'pashmina');
   const subcategory = category?.subcategories?.find(s => s.id === 'muffler');
   const { products, loading, error } = useProductHook('subcategory', 'muffler');

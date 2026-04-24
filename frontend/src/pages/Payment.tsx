@@ -35,7 +35,7 @@ export function Payment() {
   }, []);
 
   const checkoutId = location.state?.checkoutId;
-
+//success
   useEffect(() => {
     const status = searchParams.get('status');
     const err = searchParams.get('error');
@@ -52,12 +52,12 @@ export function Payment() {
     const userEmail = localStorage.getItem('userEmail');
 
     if (!userEmail) {
-      alert("Error: No user email found. Please ensure you are logged in.");
+      alert("Error, no user email found make sure to login");
       return;
     }
 
     if (!checkoutId && paymentMethod === 'card') {
-      alert("Error: Checkout session not found. Please try again from the checkout page.");
+      alert("Error, checkout session not found try again from the checkout page");
       return;
     }
 
@@ -79,6 +79,10 @@ export function Payment() {
         const data = await response.json();
 
         if (data.success) {
+          if (data.email_sent === false && data.email_error) {
+            console.warn('Reservation email failed:', data.email_error);
+            alert('Order reserved, but confirmation email failed: ' + data.email_error);
+          }
           setIsProcessing(false);
           setIsSuccess(true);
           clearCart();
@@ -116,7 +120,7 @@ export function Payment() {
             const input = document.createElement('input');
             input.type = 'hidden';
             input.name = key;
-            input.value = value as string;
+            input.value = value as string; //amount, signature, productcode
             form.appendChild(input);
           });
 

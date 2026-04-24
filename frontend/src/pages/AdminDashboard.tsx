@@ -1,21 +1,24 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Package, ShoppingCart, Users, Search, Plus, Edit2,
-  Trash2, Filter, AlertCircle, ChevronRight, Settings,
-  Eye, X, Mail, Phone, MapPin, Calendar,
+  Trash2, Filter, ChevronRight, Settings, CheckCircle2,
+  Eye, X, Mail, Phone, MapPin, Calendar, LogOut,
 } from 'lucide-react';
 import { Product, User, Analytics, StoreSettings } from './AdminTypes';
 import { ProductModal } from './ProductModal';
 import { BarChart, TrendingUp, DollarSign, CreditCard as CardIcon, Store, Globe, Phone as PhoneIcon, Mail as MailIcon, MapPin as MapIcon, Save, ToggleLeft, ToggleRight } from 'lucide-react';
 
 export function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('products');
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('settings');
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productList, setProductList] = useState<Product[]>([]);
+  const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
@@ -33,8 +36,16 @@ export function AdminDashboard() {
     try {
       const res = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/products.php');
       const data = await res.json();
-      setProductList(Array.isArray(data) ? data : []);
+      setProductList(Array.isArray(data) ? data : []); // new product #3, product #2, product #1
     } catch (e) { console.error("Product Fetch Error:", e); }
+  };
+
+  const fetchPendingProducts = async () => {
+    try {
+      const res = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/products.php?approval_status=pending');
+      const data = await res.json();
+      setPendingProducts(Array.isArray(data) ? data : []);
+    } catch (e) { console.error("Pending Products Fetch Error:", e); }
   };
 
   const fetchUsers = async () => {
@@ -62,6 +73,7 @@ export function AdminDashboard() {
   };
 
   const updateOrderStatus = async (orderId: number, newStatus: string, userEmail: string) => {
+    // Optimistic Update
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
 
     try {
@@ -70,17 +82,16 @@ export function AdminDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: orderId, status: newStatus, user_email: userEmail })
       });
-      const text = await res.text();
-      const data = JSON.parse(text.trim());
-      console.log('Response:', data);
+      const data = await res.json();
       if (!res.ok) {
-        fetchOrders();
-        alert(`Failed: ${data.error}`);
+        throw new Error(data.error || 'Update failed');
       }
-    } catch (e) {
+      // Re-fetch orders to ensure server sync
       fetchOrders();
-      console.error('Full error:', e);
-      alert("Failed to update order status");
+    } catch (e: any) {
+      console.error('Update error:', e);
+      alert(`Failed to update status: ${e.message}`);
+      fetchOrders(); // Revert on failure
     }
   };
 
@@ -130,12 +141,30 @@ export function AdminDashboard() {
     }
   };
 
+  // Auth check
   useEffect(() => {
+    const adminToken = localStorage.getItem('adminToken');
+    if (!adminToken) {
+      navigate('/admin-login');
+    }
+  }, [navigate]);
+
+  useEffect(() => {  // important
     fetchProducts();
+    fetchPendingProducts();
     fetchUsers();
     fetchOrders();
     fetchAnalytics();
     fetchSettings();
+
+    // Polling for live updates (Users & Orders)
+    const interval = setInterval(() => {
+      fetchUsers();
+      fetchOrders();
+      fetchPendingProducts();
+    }, 15000); // 15 seconds
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleDeleteProduct = async (id: number) => {
@@ -144,6 +173,36 @@ export function AdminDashboard() {
       const res = await fetch(`http://localhost/ShrawanHandicraftsFYP/backend/api/products.php?id=${id}`, { method: 'DELETE' });
       if (res.ok) fetchProducts();
     } catch (e) { alert("Failed to delete product"); }
+  };
+
+  const handleApproveProduct = async (id: number) => {
+    try {
+      const res = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/products.php?action=approve', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, approval_status: 'approved' })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        alert('Product approved!');
+        fetchPendingProducts();
+      }
+    } catch (e) { console.error("Approval Error:", e); }
+  };
+
+  const handleRejectProduct = async (id: number) => {
+    try {
+      const res = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/products.php?action=reject', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, approval_status: 'rejected' })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        alert('Product rejected');
+        fetchPendingProducts();
+      }
+    } catch (e) { console.error("Rejection Error:", e); }
   };
 
   const handleDeleteUser = async (id: number) => {
@@ -187,6 +246,7 @@ export function AdminDashboard() {
                   <tr><th className="p-6">Product</th><th>Category</th><th>Price</th><th>Stock</th><th className="p-6 text-right">Actions</th></tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+
                   {filteredProducts.map(p => (
                     <tr key={p.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
                       <td className="p-6">
@@ -203,7 +263,10 @@ export function AdminDashboard() {
                         </span>
                       </td>
                       <td className="p-6 text-right space-x-2">
-                        <button onClick={() => { setSelectedProduct(p); setModalMode('edit'); setIsModalOpen(true); }} className="p-2 text-text-secondary hover:text-accent hover:bg-accent/5 rounded-lg transition-all"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => { setSelectedProduct(p);  //store clicked product
+                           setModalMode('edit'); //set mode to edit
+                            setIsModalOpen(true); //open modal
+                             }} className="p-2 text-text-secondary hover:text-accent hover:bg-accent/5 rounded-lg transition-all"><Edit2 className="w-4 h-4" /></button>
                         <button onClick={() => handleDeleteProduct(p.id)} className="p-2 text-text-secondary hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
                       </td>
                     </tr>
@@ -279,6 +342,7 @@ export function AdminDashboard() {
                       <td>
                         <select
                           value={o.status ?? 'pending'}
+                          
                           onChange={e => updateOrderStatus(o.id, e.target.value, o.user_email)}
                           className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase border-0 outline-none cursor-pointer ${o.status === 'delivered' ? 'bg-green-50 text-green-600' :
                             o.status === 'pending' ? 'bg-amber-50 text-amber-600' :
@@ -302,6 +366,60 @@ export function AdminDashboard() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        );
+
+      case 'approvals':
+        return (
+          <div className="space-y-6">
+            <div className="relative w-full md:w-96">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+              <input
+                type="text"
+                placeholder="Search pending products..."
+                className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-bg-card border border-gray-200 dark:border-gray-800 rounded-lg outline-none"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="bg-white dark:bg-bg-card rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 dark:bg-gray-900/50 text-[11px] uppercase tracking-wider text-text-secondary font-bold">
+                  <tr>
+                    <th className="p-6">Product</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Seller</th>
+                    <th className="p-6 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {pendingProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
+                      <td className="p-6">
+                        <div className="flex items-center gap-4">
+                          <img src={p.image} className="w-12 h-12 rounded-lg object-cover border border-gray-100 dark:border-gray-800" alt="" />
+                          <div><p className="font-serif font-bold text-text-primary">{p.name}</p><p className="text-xs text-text-secondary">{p.material}</p></div>
+                        </div>
+                      </td>
+                      <td className="text-sm text-text-secondary capitalize">{p.category.replace(/-/g, ' ')}</td>
+                      <td className="font-medium text-text-primary">Rs. {Number(p.price).toLocaleString()}</td>
+                      <td className="text-sm text-text-secondary">Seller ID: {p.seller_id}</td>
+                      <td className="p-6 text-right space-x-2">
+                        <button onClick={() => handleApproveProduct(p.id)} className="px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg text-sm font-medium transition-all">Approve</button>
+                        <button onClick={() => handleRejectProduct(p.id)} className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-medium transition-all">Reject</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {pendingProducts.length === 0 && (
+                <div className="p-8 text-center text-text-secondary">
+                  <p className="font-medium">No pending products</p>
+                  <p className="text-sm">All products have been reviewed.</p>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -347,13 +465,12 @@ export function AdminDashboard() {
                           const maxRevenue = Math.max(...analytics.dailySales.map(d => d.revenue), 1);
                           const height = (day.revenue / maxRevenue) * 100;
                           return (
-                            <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+                            <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full">
                               <div className="relative w-full flex flex-col justify-end h-full">
                                 <motion.div
                                   initial={{ height: 0 }}
                                   animate={{ height: `${height}%` }}
-                                  className="w-full bg-accent/20 group-hover:bg-accent/40 rounded-t-lg transition-colors relative"
-                                >
+className="w-full bg-blue-500 group-hover:bg-blue-600 rounded-t-lg transition-colors relative"                            >
                                   {day.revenue > 0 && (
                                     <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
                                       Rs. {day.revenue.toLocaleString()}
@@ -509,13 +626,7 @@ export function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <div className="p-8 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/50 rounded-2xl flex items-start gap-4">
-                <AlertCircle className="w-6 h-6 text-amber-600 mt-0.5" />
-                <div>
-                  <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm">Caution: Payment Method Toggles</h4>
-                  <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 leading-relaxed opacity-80">Disabling a payment gateway will immediately remove it as an option from the customer checkout page. Ensure at least one method remains active to avoid checkout failures.</p>
-                </div>
-              </div>
+            
             </div>
           </div>
         );
@@ -531,10 +642,11 @@ export function AdminDashboard() {
         </div>
         <nav className="flex-1 px-4 space-y-1">
           {[
+            { id: 'settings', label: 'Dashboard', icon: Settings },
             { id: 'products', label: 'Inventory', icon: Package },
             { id: 'orders', label: 'Orders', icon: ShoppingCart },
+            { id: 'approvals', label: 'Product Approvals', icon: CheckCircle2 },
             { id: 'users', label: 'Customers', icon: Users },
-            { id: 'settings', label: 'Dashboard', icon: Settings },
           ].map(item => (
             <button key={item.id} onClick={() => { setActiveTab(item.id); setSearchQuery(''); }} className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl text-sm font-medium transition-all ${activeTab === item.id ? 'bg-accent text-white shadow-lg shadow-accent/30' : 'text-text-secondary hover:bg-gray-50 dark:hover:bg-gray-900'}`}>
               <item.icon className="w-5 h-5" /> {item.label}
@@ -553,6 +665,10 @@ export function AdminDashboard() {
           <div className="flex items-center gap-6">
             <div className="flex flex-col items-end"><p className="text-sm font-bold">Admin User</p><p className="text-[10px] text-accent font-bold uppercase tracking-widest">Admin</p></div>
             <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-800"></div>
+            <button onClick={() => { localStorage.removeItem('adminToken'); localStorage.removeItem('adminUsername'); navigate('/admin-login'); }} className="flex items-center gap-2 px-3 py-2 text-sm bg-red-500/10 text-red-600 hover:bg-red-500/20 rounded-lg transition-colors border border-red-200 dark:border-red-900">
+              <LogOut className="w-4 h-4" />
+              <span>Logout</span>
+            </button>
           </div>
         </header>
 
@@ -569,7 +685,7 @@ export function AdminDashboard() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
               });
-              if (res.ok) { fetchProducts(); setIsModalOpen(false); }
+              if (res.ok) { fetchProducts(); setIsModalOpen(false); } // calls db and updates UI
             } catch (e) { console.error(e); }
           }} />
         )}

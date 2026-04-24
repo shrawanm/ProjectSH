@@ -21,14 +21,14 @@ export function ForgotPassword() {
           body: JSON.stringify({ email }),
         }
       );
-
+//received response by request-otp.php
       const data = await res.json();
 
       if (!res.ok) {
         alert(data.error || "Failed to send OTP");
         return;
       }
-
+// navigates to otp field page, otpVerification.tsx
       navigate("/verify-otp", { state: { email } });
     } catch (err) {
       console.error(err);

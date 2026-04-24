@@ -5,6 +5,7 @@ import { ProductCard } from '../components/ProductCard';
 import { useProductHook } from '../pages/productHook';
 
 export function GenericSubcategoryProducts() {
+  // dynamically get category and subcategory from URL params
   const { categoryId, subcategoryId } = useParams();
   
   const category = categories.find(c => c.id === categoryId);

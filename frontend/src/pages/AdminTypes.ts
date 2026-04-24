@@ -90,6 +90,8 @@ export type Product = {
   stock: number;
   rating?: number;
   reviews?: number;
+  seller_id?: number | null;
+  approval_status?: 'pending' | 'approved' | 'rejected';
   variants: {
     colors: string[];
     sizes: string[];
@@ -113,6 +115,37 @@ export type User = {
   joined: string;
   avatar?: string;
   registrationMethod?: string;
+};
+
+export type Analytics = {
+  overview: {
+    totalRevenue: number;
+    totalOrders: number;
+    avgOrderValue: number;
+  };
+  paymentBreakdown: {
+    payment_method: string;
+    count: number;
+    revenue: number;
+  }[];
+  topProducts: {
+    name: string;
+    sales: number;
+    revenue: number;
+    image: string;
+  }[];
+  dailySales: {
+    date: string;
+    revenue: number;
+  }[];
+};
+
+export type StoreSettings = {
+  esewa_enabled: string;
+  pickup_enabled: string;
+  store_email: string;
+  store_phone: string;
+  store_address: string;
 };
 
 export const normalizeProductData = (product: Product | null): Partial<Product> => {

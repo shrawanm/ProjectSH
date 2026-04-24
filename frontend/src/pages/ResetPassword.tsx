@@ -17,7 +17,7 @@ export function ResetPassword() {
       alert("Passwords do not match or too short");
       return;
     }
-
+// after user input new password calls resrt-password.php
     try {
       const res = await fetch(
         "http://localhost/ShrawanHandicraftsFYP/backend/api/reset-password.php",
@@ -32,7 +32,7 @@ export function ResetPassword() {
         alert("Failed to reset password");
         return;
       }
-
+// new password reset success notice
       alert("Password reset successful");
       navigate("/login");
     } catch (err) {

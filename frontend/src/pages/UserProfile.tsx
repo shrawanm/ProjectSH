@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
   Mail,
-
   Trash2,
   Edit2,
   Save,

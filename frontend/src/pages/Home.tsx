@@ -1,11 +1,52 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ParallaxHero } from '../components/ParallaxHero';
 import { ProductCard } from '../components/ProductCard';
 import { products, categories } from '../data/mockData';
-import { ArrowRight, Star } from 'lucide-react';
+import { ArrowRight, Star, Loader } from 'lucide-react';
+
 export function Home() {
-  const featuredProducts = products.slice(0, 4);
+  const [bestSellers, setBestSellers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchBestSellers = async () => {
+      try {
+        setLoading(true);
+                const productsRes = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/products.php');
+        const allProducts = await productsRes.json();
+        const productList = Array.isArray(allProducts) ? allProducts : [];
+        const analyticsRes = await fetch('http://localhost/ShrawanHandicraftsFYP/backend/api/get_analytics.php');
+        const analyticsData = await analyticsRes.json();
+
+        if (analyticsData.status === 'success' && analyticsData.data.topProducts.length > 0) {
+          //match analytics topproducts with full product data from database
+          const enrichedBestSellers = analyticsData.data.topProducts
+            .slice(0, 3)
+            .map((topProduct: any) => {
+              //find matching product in database by name
+              const fullProduct = productList.find((p: any) => 
+                p.name.toLowerCase() === topProduct.name.toLowerCase()
+              );
+              return fullProduct || topProduct;
+            });
+          
+          setBestSellers(enrichedBestSellers);
+        } else {
+          setBestSellers(productList.length > 0 ? productList.slice(0, 3) : products.slice(0, 3));
+        }
+      } catch (error) {
+        console.error('Error fetching best sellers:', error);
+        //goto mockdata
+        setBestSellers(products.slice(0, 4));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBestSellers();
+  }, []);
   return <div className="min-h-screen bg-bg-light dark:bg-bg-dark">
       <ParallaxHero />
 
@@ -75,8 +116,14 @@ export function Home() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredProducts.map(product => <ProductCard key={product.id} product={product} />)}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {loading ? (
+              <div className="col-span-full flex items-center justify-center py-20">
+                <Loader className="w-8 h-8 animate-spin text-accent" />
+              </div>
+            ) : (
+              bestSellers.map(product => <ProductCard key={product.id} product={product} />)
+            )}
           </div>
         </div>
       </section>
@@ -110,7 +157,7 @@ export function Home() {
                 Preserving the Art of the Himalayas
               </h2>
               <p className="text-text-secondary text-lg leading-relaxed mb-8">
-                Shrawan Handicrafts is more than a brand; it's a bridge between
+                Shrawan Handicrafts is more than a brand, it's a bridge between
                 ancient Nepali craftsmanship and the modern world. We work
                 directly with master artisans to bring you authentic, ethically
                 sourced treasures that tell a story of culture, dedication, and

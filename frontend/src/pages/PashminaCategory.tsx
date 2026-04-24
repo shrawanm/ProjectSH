@@ -4,6 +4,7 @@ import { ArrowRight, ChevronRight } from 'lucide-react';
 import { categories } from '../data/mockData';
 export function PashminaCategory() {
   const navigate = useNavigate();
+  
   const category = categories.find(c => c.id === 'pashmina');
   if (!category || !category.subcategories) {
     return <div className="pt-32 text-center">Category not found</div>;
