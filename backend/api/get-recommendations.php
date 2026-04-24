@@ -3,41 +3,31 @@ header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
-
 include '../config/db.php';
-
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
-
-
 function getColorFamily($hexCode) {
     if (!$hexCode || !preg_match('/^#[0-9A-F]{6}$/i', $hexCode)) {
         return 'neutral';
     }
-    
     $hex = ltrim($hexCode, '#');
     $r = hexdec(substr($hex, 0, 2));
     $g = hexdec(substr($hex, 2, 2));
     $b = hexdec(substr($hex, 4, 2));
-    
-    // Check if it's neutral (grayscale)
+    //checks grayscale
     if (abs($r - $g) < 30 && abs($g - $b) < 30 && abs($r - $b) < 30) {
         return 'neutral';
     }
-    
-    // Determine warmth: if red or yellow dominates = warm
     $warmthScore = ($r - $b) + ($g - $b) / 2;
-    
     if ($warmthScore > 30) {
-        return 'warm';  // Red, Orange, Yellow dominated
+        return 'warm';  
     } elseif ($warmthScore < -30) {
-        return 'cool';  // Blue, Green dominated
+        return 'cool';  
     } else {
         return 'neutral';
     }
 }
-
 //normalizes the product colors
 function normalizeProduct($product) {
     $colorFamilies = [];
@@ -181,23 +171,17 @@ try {
         ]);
         exit;
     }
-    
-    // Normalize current product
-    $currentNormalized = normalizeProduct($currentProduct);
-    
-    // Calculate price range for similarity (40% of current product)
+        $currentNormalized = normalizeProduct($currentProduct);
     $priceRange = $currentProduct['price'] * 0.4; // 20% above + 20% below
     if ($priceRange === 0) {
-        $priceRange = 100; // Default range if price is 0
+        $priceRange = 100; 
     }
-    
-    // Calculate similarities
     $similarities = [];
     foreach ($allProducts as $product) {
         $comparisonNormalized = normalizeProduct($product);
         $score = cosineSimilarity($currentNormalized, $comparisonNormalized, $priceRange);
         
-        // Only include products with score > 0.4
+        //includes products with score greater thn 0.4
         if ($score > 0.4) {
             $similarities[] = [
                 'id' => $product['id'],
